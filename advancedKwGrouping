@@ -1,0 +1,151 @@
+/**
+ * Calculate similarity between two strings
+ * @param {string} str1 First string to match
+ * @param {string} str2 Second string to match
+ * @param {number} [substringLength=2] Optional. Length of substring to be used in calculating similarity. Default 2.
+ * @param {boolean} [caseSensitive=false] Optional. Whether you want to consider case in string matching. Default false;
+ * @returns Number between 0 and 1, with 0 being a low match score.
+ */
+
+
+/*
+Changes made by
+Author https://www.chicagocomputerclasses.com/
+YouTube Channel https://www.youtube.com/channel/UC8p19gUXJYTsUPEpusHgteQ
+Video https://youtu.be/Ft5lxsXIGfE
+*/
+
+const stringSimilarity = function (str1, str2, substringLength, caseSensitive) {
+    if (substringLength === void 0) { substringLength = 2; }
+    if (caseSensitive === void 0) { caseSensitive = false; }
+    if (!caseSensitive) {
+        str1 = str1.toLowerCase();
+        str2 = str2.toLowerCase();
+    }
+    if (str1.length < substringLength || str2.length < substringLength)
+        return 0;
+    const map = new Map();
+    for (let i = 0; i < str1.length - (substringLength - 1); i++) {
+        const substr1 = str1.substr(i, substringLength);
+        map.set(substr1, map.has(substr1) ? map.get(substr1) + 1 : 1);
+    }
+    let match = 0;
+    for (let j = 0; j < str2.length - (substringLength - 1); j++) {
+        const substr2 = str2.substr(j, substringLength);
+        const count = map.has(substr2) ? map.get(substr2) : 0;
+        if (count > 0) {
+            map.set(substr2, count - 1);
+            match++;
+        }
+    }
+    return (match * 2) / (str1.length + str2.length - ((substringLength - 1) * 2));
+};
+
+// Function to calculate Levenshtein distance
+function levenshtein(a, b) {
+  const matrix = [];
+
+  let i;
+  for (i = 0; i <= b.length; i++) {
+    matrix[i] = [i];
+  }
+
+  let j;
+  for (j = 0; j <= a.length; j++) {
+    matrix[0][j] = j;
+  }
+
+  for (i = 1; i <= b.length; i++) {
+    for (j = 1; j <= a.length; j++) {
+      if (b.charAt(i - 1) === a.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(matrix[i - 1][j - 1] + 1,
+          Math.min(matrix[i][j - 1] + 1, matrix[i - 1][j] + 1));
+      }
+    }
+  }
+
+  return 1 - matrix[b.length][a.length] / Math.max(a.length, b.length);
+}
+
+class SimilarStringFinder {
+  constructor(targetPhrase, phraseList, minScore = 0) {
+    this.targetPhrase = targetPhrase;
+    this.phraseList = phraseList;
+    this.scores = null;
+    this.minScore = minScore;
+    this.bestMatch = { phrase: null, score: null, position: null };
+    this.findScores();
+  }
+
+ findScores() {
+  this.scores = this.phraseList.map((phrase, i) => {
+    if (phrase === null || phrase === "" || typeof phrase !== "string") return { phrase: null, score: null, position: i };
+    const levScore = levenshtein(this.targetPhrase, phrase);
+    const substringScore = stringSimilarity(this.targetPhrase, phrase);
+    let combinedScore;
+
+    if(substringScore === 0) {
+      combinedScore = levScore;
+    } else {
+      combinedScore = (levScore + substringScore) / 2; // You can adjust this formula if needed
+    }
+
+    const currentMatch = { phrase: phrase, score: combinedScore, position: i };
+    if (this.bestMatch.score === null || this.bestMatch.score < currentMatch.score) {
+      this.bestMatch = { ...currentMatch };
+    }
+    return currentMatch;
+  });
+}}
+
+
+// Rest of your script...
+// Continue with the rest of your script here...
+
+function FINDSIMILARTEXT(targetPhrase, phraseList, minimumScore = 0, returnType = "text") {
+  if (!(phraseList.length === 1 || phraseList[0].length === 1)) throw new Error("phraseList Range must be a single column or row.")
+  const reshapedPhraseList = phraseList.flat()
+  if (!Array.isArray(targetPhrase)) targetPhrase = [[targetPhrase]]
+  if (!(targetPhrase.length === 1 || targetPhrase[0].length === 1)) throw new Error("targetPhrase Range must be a single column or row.")
+  if (targetPhrase.length === 1 || targetPhrase[0].length > 1) {
+    return [
+      targetPhrase[0].map(v => {
+        return FINDSIMILARTEXT_return_options_(v, reshapedPhraseList, minimumScore, returnType, "column")
+      })
+    ]
+  }
+  if (targetPhrase.length >= 1 || targetPhrase[0].length === 1) {
+    return targetPhrase.map(v => {
+      return FINDSIMILARTEXT_return_options_(v[0], reshapedPhraseList, minimumScore, returnType, "row")
+    })
+  }
+}
+
+function FINDSIMILARTEXT_return_options_(v, reshapedPhraseList, minimumScore, returnType, rangeDirection) {
+  const compare = new SimilarStringFinder(v, reshapedPhraseList, minimumScore)
+  const rangeDirectionBool = rangeDirection === "column"
+  if (returnType === "text") return (rangeDirectionBool ? compare.bestMatch.phrase : [compare.bestMatch.phrase])
+  if (returnType === "position" && compare.bestMatch.phrase !== null) return (rangeDirectionBool ? compare.bestMatch.position + 1 : [compare.bestMatch.position + 1])
+  return (rangeDirectionBool ? null : [null])
+}
+
+function GROUP_KEYWORD(keyword, adGroups, allKeywords) {
+  var threshold = 0.5; // adjust this value according to your needs
+  var bestMatch = FINDSIMILARTEXT(keyword, adGroups, threshold, "text");
+
+  if (bestMatch == null || bestMatch.length == 0) {
+    for (var i = 0; i < allKeywords.length; i++) {
+      if (allKeywords[i][0] == keyword) continue;
+      var match = FINDSIMILARTEXT(keyword, [allKeywords[i][0]], threshold, "text");
+      if (match != null && match.length > 0) {
+        bestMatch = match;
+        break;
+      }
+    }
+  }
+
+  return bestMatch;
+}
+
